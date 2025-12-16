@@ -29,8 +29,11 @@ func (fn ConfiguratorFunc) Configure(config *Config) {
 // Config stores swagger configuration variables.
 type Config struct {
 	// The URL pointing to API definition (normally swagger.json or swagger.yaml).
-	// Default is `swagger.json`.
+	// Default is `swagger/swagger.json`. DEPRECATED: Use URLs instead.
 	URL string
+	// The URLs pointing to API definitions (normally swagger.json or swagger.yaml).
+	// Default is `["swagger/swagger.json"]`.
+	URLs []string
 	// The prefix url which this swagger ui is registered on.
 	// Defaults to "/swagger". It can be a "." too.
 	Prefix       string
@@ -41,23 +44,73 @@ type Config struct {
 	DomID        string
 	// Enabling tag Filtering
 	Filter bool
+	// Persist authorization information over browser close/refresh
+	PersistAuthorization bool
+	// Syntax highlighting for the swagger UI
+	SyntaxHighlight bool
+	// Information for OAuth2 integration
+	OAuth *OAuthConfig
+	// Enable OAuth2 PKCE
+	Oauth2UsePkce bool
+	// Default OAuth2 client ID
+	Oauth2DefaultClientID string
+	// Default expansion depth for models
+	DefaultModelsExpandDepth int
+}
+
+// OAuthConfig stores configuration for Swagger UI OAuth2 integration.
+type OAuthConfig struct {
+	// The ID of the client sent to the OAuth2 IAM provider.
+	ClientId string
+	// The OAuth2 realm that the client should operate in. If not applicable, use empty string.
+	Realm string
+	// The name to display for the application in the authentication popup.
+	AppName string
 }
 
 // Configure completes the Configurator interface.
 // It allows to pass a Config as it is and override any option.
 func (c Config) Configure(config *Config) {
-	config.URL = c.URL
+	if c.URL != "" {
+		config.URLs = []string{c.URL}
+		config.URL = c.URL // for backward compatibility
+	}
+	if len(c.URLs) > 0 {
+		config.URLs = c.URLs
+		// Set the first URL as primary URL for backward compatibility
+		if config.URL == "" && len(c.URLs) > 0 {
+			config.URL = c.URLs[0]
+		}
+	}
 	config.Prefix = c.Prefix
 	config.DeepLinking = c.DeepLinking
 	config.DocExpansion = c.DocExpansion
 	config.DomID = c.DomID
 	config.Filter = c.Filter
+	config.PersistAuthorization = c.PersistAuthorization
+	config.SyntaxHighlight = c.SyntaxHighlight
+	config.OAuth = c.OAuth
+	config.Oauth2UsePkce = c.Oauth2UsePkce
+	config.Oauth2DefaultClientID = c.Oauth2DefaultClientID
+	config.DefaultModelsExpandDepth = c.DefaultModelsExpandDepth
 }
 
 // URL presents the URL pointing to API definition (normally swagger.json or swagger.yaml).
+// For backward compatibility - adds single URL to URLs slice.
 func URL(url string) ConfiguratorFunc {
 	return func(c *Config) {
-		c.URL = url
+		if c.URL == "" {
+			c.URLs = []string{url}
+		} else {
+			c.URLs = append(c.URLs, url)
+		}
+	}
+}
+
+// URLs presents the URLs pointing to API definitions (normally swagger.json or swagger.yaml).
+func URLs(urls ...string) ConfiguratorFunc {
+	return func(c *Config) {
+		c.URLs = urls
 	}
 }
 
@@ -139,6 +192,53 @@ func DomID(domID string) ConfiguratorFunc {
 func DeepLinking(deepLinking bool) ConfiguratorFunc {
 	return func(c *Config) {
 		c.DeepLinking = deepLinking
+	}
+}
+
+// PersistAuthorization Persist authorization information over browser close/refresh.
+// Defaults to false.
+func PersistAuthorization(persistAuthorization bool) ConfiguratorFunc {
+	return func(c *Config) {
+		c.PersistAuthorization = persistAuthorization
+	}
+}
+
+// SyntaxHighlight enable syntax highlighting for the swagger UI.
+// Defaults to false for backward compatibility.
+func SyntaxHighlight(syntaxHighlight bool) ConfiguratorFunc {
+	return func(c *Config) {
+		c.SyntaxHighlight = syntaxHighlight
+	}
+}
+
+// OAuth configure OAuth2 integration.
+func OAuth(config *OAuthConfig) ConfiguratorFunc {
+	return func(c *Config) {
+		c.OAuth = config
+	}
+}
+
+// Oauth2UsePkce enables Proof Key for Code Exchange.
+// Corresponds to the usePkceWithAuthorizationCodeGrant property of the Swagger UI
+// and applies only to accessCode (Authorization Code) flows.
+func Oauth2UsePkce(usePkce bool) ConfiguratorFunc {
+	return func(c *Config) {
+		c.Oauth2UsePkce = usePkce
+	}
+}
+
+// Oauth2DefaultClientID set the default client ID used for OAuth2.
+func Oauth2DefaultClientID(oauth2DefaultClientID string) ConfiguratorFunc {
+	return func(c *Config) {
+		c.Oauth2DefaultClientID = oauth2DefaultClientID
+	}
+}
+
+// DefaultModelsExpandDepth set the default expansion depth for models
+// (set to -1 completely hide the models).
+func DefaultModelsExpandDepth(depth int) ConfiguratorFunc {
+	return func(c *Config) {
+		c.DefaultModelsExpandDepth = depth
 	}
 }
 
@@ -302,18 +402,32 @@ var indexTmpl = template.Must(template.New("swagger_index.html").Parse(`<!-- HTM
     </symbol>
   </defs>
 </svg>
-<div id="swagger-ui"></div>
+<div id="{{.DomID | default "swagger-ui"}}"></div>
 <script src="{{.Prefix}}/swagger-ui-bundle.js"> </script>
 <script src="{{.Prefix}}/swagger-ui-standalone-preset.js"> </script>
 <script>
 window.onload = function() {
   // Build a system
   const ui = SwaggerUIBundle({
+    {{if .URLs}}
+    urls: [
+      {{range $index, $url := .URLs}}
+      {{if gt $index 0}},{{end}}
+      {
+        name: "{{$url}}",
+        url: "{{$url}}"
+      }
+      {{end}}
+    ],
+    {{else}}
     url: "{{.URL}}",
+    {{end}}
+    dom_id: "{{.DomID | default "#swagger-ui"}}",
     deepLinking: {{.DeepLinking}},
     docExpansion: "{{.DocExpansion}}",
-    dom_id: "{{.DomID}}",
     validatorUrl: null,
+    syntaxHighlight: {{.SyntaxHighlight}},
+    persistAuthorization: {{.PersistAuthorization}},
     presets: [
       SwaggerUIBundle.presets.apis,
       SwaggerUIStandalonePreset
@@ -322,8 +436,29 @@ window.onload = function() {
       SwaggerUIBundle.plugins.DownloadUrl
     ],
     layout: "StandaloneLayout",
+    {{if .DefaultModelsExpandDepth}}defaultModelsExpandDepth: {{.DefaultModelsExpandDepth}},{{end}}
     filter: {{.Filter}}
   })
+
+  {{if .Oauth2DefaultClientID}}
+  const defaultClientId = "{{.Oauth2DefaultClientID}}";
+  if (defaultClientId) {
+    ui.initOAuth({
+      clientId: defaultClientId,
+      usePkceWithAuthorizationCodeGrant: {{.Oauth2UsePkce}}
+    })
+  }
+  {{end}}
+
+  {{if .OAuth}}
+  ui.initOAuth({
+    clientId: "{{.OAuth.ClientId}}",
+    realm: "{{.OAuth.Realm}}",
+    appName: "{{.OAuth.AppName}}",
+    {{if .Oauth2UsePkce}}usePkceWithAuthorizationCodeGrant: true{{end}}
+  })
+  {{end}}
+
   window.ui = ui
 }
 </script>
