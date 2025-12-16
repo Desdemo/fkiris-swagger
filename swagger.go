@@ -242,7 +242,22 @@ func DefaultModelsExpandDepth(depth int) ConfiguratorFunc {
 	}
 }
 
-var instanceNameRegex = regexp.MustCompile(`^/(\w+)\.json$`)
+var (
+	// instanceNameRegex 用于匹配URL路径中的实例名
+	instanceNameRegex = regexp.MustCompile(`^/(\w+)\.json$`)
+
+	// DefaultConfig 默认的Swagger配置
+	DefaultConfig = &Config{
+		URL:          "swagger/swagger.json",
+		DeepLinking:  true,
+		DocExpansion: "list",
+		DomID:        "#swagger-ui",
+		Prefix:       "/swagger",
+		FontCDN:      "https://fonts.googleapis.com",
+		Theme:        Unknow,
+		Filter:       true,
+	}
+)
 
 // Handler wraps the webdav http handler into an Iris Handler one.
 //
@@ -266,19 +281,11 @@ var instanceNameRegex = regexp.MustCompile(`^/(\w+)\.json$`)
 //	 DomID: ...,
 //	}
 func Handler(h *webdav.Handler, configurators ...Configurator) iris.Handler {
-	config := &Config{
-		URL:          "swagger/swagger.json",
-		DeepLinking:  true,
-		DocExpansion: "list",
-		DomID:        "#swagger-ui",
-		Prefix:       "/swagger",
-		FontCDN:      "https://fonts.googleapis.com",
-		Theme:        Unknow,
-		Filter:       true,
-	}
+	// Start with default configuration
+	config := *DefaultConfig
 
 	for _, c := range configurators {
-		c.Configure(config)
+		c.Configure(&config)
 	}
 
 	if prefix := config.Prefix; prefix != "" && prefix != "." {
@@ -303,11 +310,22 @@ func Handler(h *webdav.Handler, configurators ...Configurator) iris.Handler {
 			}
 		}
 		if match := instanceNameRegex.FindStringSubmatch(path); match != nil {
-			doc, err := swag.ReadDoc(match[1]) // default instance name is swagger
+			instanceName := match[1]
+			doc, err := swag.ReadDoc(instanceName)
 			if err != nil {
-				ctx.Application().Logger().Errorf("swagger: %v", err)
-				ctx.StatusCode(iris.StatusInternalServerError)
-				return
+				// If the specified instance name is not found, try the default "swagger" instance
+				if instanceName != swag.Name {
+					doc, err = swag.ReadDoc(swag.Name)
+					if err != nil {
+						ctx.Application().Logger().Errorf("swagger: instance %q not found and default instance %q also not found: %v", instanceName, swag.Name, err)
+						ctx.StatusCode(iris.StatusInternalServerError)
+						return
+					}
+				} else {
+					ctx.Application().Logger().Errorf("swagger: %v", err)
+					ctx.StatusCode(iris.StatusInternalServerError)
+					return
+				}
 			}
 			ctx.WriteString(doc)
 			return
@@ -402,7 +420,7 @@ var indexTmpl = template.Must(template.New("swagger_index.html").Parse(`<!-- HTM
     </symbol>
   </defs>
 </svg>
-<div id="{{.DomID | default "swagger-ui"}}"></div>
+<div id="swagger-ui"></div>
 <script src="{{.Prefix}}/swagger-ui-bundle.js"> </script>
 <script src="{{.Prefix}}/swagger-ui-standalone-preset.js"> </script>
 <script>
@@ -422,7 +440,7 @@ window.onload = function() {
     {{else}}
     url: "{{.URL}}",
     {{end}}
-    dom_id: "{{.DomID | default "#swagger-ui"}}",
+    dom_id: "#swagger-ui",
     deepLinking: {{.DeepLinking}},
     docExpansion: "{{.DocExpansion}}",
     validatorUrl: null,

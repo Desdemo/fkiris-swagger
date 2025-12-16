@@ -24,16 +24,16 @@ paths:
   /testapi/get-string-by-int/{some_id}:
     get:
       consumes:
-      - application/json
+        - application/json
       description: get string by ID
       parameters:
-      - description: Some ID
-        in: path
-        name: some_id
-        required: true
-        type: integer
+        - description: Some ID
+          in: path
+          name: some_id
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: ok
@@ -51,26 +51,26 @@ paths:
   /testapi/get-struct-array-by-string/{some_id}:
     get:
       consumes:
-      - application/json
+        - application/json
       description: get struct array by ID
       parameters:
-      - description: Some ID
-        in: path
-        name: some_id
-        required: true
-        type: string
-      - description: Offset
-        in: query
-        name: offset
-        required: true
-        type: integer
-      - description: Offset
-        in: query
-        name: limit
-        required: true
-        type: integer
+        - description: Some ID
+          in: path
+          name: some_id
+          required: true
+          type: string
+        - description: Offset
+          in: query
+          name: offset
+          required: true
+          type: integer
+        - description: Offset
+          in: query
+          name: limit
+          required: true
+          type: integer
       produces:
-      - application/json
+        - application/json
       responses:
         "200":
           description: ok

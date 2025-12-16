@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/iris-contrib/swagger"
-	"github.com/kataras/iris/v12"
+	"github.com/8treenet/iris/v12"
+	"github.com/Desdemo/fkiris-swagger"
 
-	"github.com/iris-contrib/swagger/_examples/basic/api"
-	"github.com/iris-contrib/swagger/swaggerFiles"
+	"github.com/Desdemo/fkiris-swagger/_examples/basic/api"
+	"github.com/Desdemo/fkiris-swagger/swaggerFiles"
 
-	_ "github.com/iris-contrib/swagger/_examples/basic/docs"
+	_ "github.com/Desdemo/fkiris-swagger/_examples/basic/docs"
 )
 
 // @title Swagger Example API
@@ -38,6 +38,7 @@ func main() {
 		swagger.URL("http://localhost:8080/swagger/doc.json"), // The url pointing to API definition.
 		swagger.DeepLinking(true),
 		swagger.Prefix("/swagger"),
+		swagger.SetTheme(swagger.Monokai),
 	)
 	// Register on http://localhost:8080/swagger
 	app.Get("/swagger", swaggerUI)

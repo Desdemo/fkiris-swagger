@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/kataras/iris/v12"
+	"github.com/8treenet/iris/v12"
 )
 
 // @Summary Add a new pet to the store
