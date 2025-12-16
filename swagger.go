@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/net/webdav"
 
-	"github.com/kataras/iris/v12"
+	"github.com/8treenet/iris/v12"
 	"github.com/swaggo/swag"
 )
 
@@ -306,7 +306,7 @@ func Handler(h *webdav.Handler, configurators ...Configurator) iris.Handler {
 			doc, err := swag.ReadDoc(match[1]) // default instance name is swagger
 			if err != nil {
 				ctx.Application().Logger().Errorf("swagger: %v", err)
-				ctx.StopWithStatus(iris.StatusInternalServerError)
+				ctx.StatusCode(iris.StatusInternalServerError)
 				return
 			}
 			ctx.WriteString(doc)
@@ -318,7 +318,7 @@ func Handler(h *webdav.Handler, configurators ...Configurator) iris.Handler {
 			err := indexTmpl.Execute(ctx, config)
 			if err != nil {
 				ctx.Application().Logger().Errorf("swagger: %v", err)
-				ctx.StopWithStatus(iris.StatusInternalServerError)
+				ctx.StatusCode(iris.StatusInternalServerError)
 				return
 			}
 		default:
